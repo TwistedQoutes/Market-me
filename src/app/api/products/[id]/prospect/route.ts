@@ -1,0 +1,71 @@
+import { z } from "zod";
+import { describeClaudeError } from "@/lib/claude/client";
+import { prospect } from "@/lib/claude/prospector";
+import { generateStrategy } from "@/lib/claude/strategy";
+import { notFound, parseBody } from "@/lib/http";
+import { getProduct, saveStrategy } from "@/lib/store";
+import type { Product, ProspectEvent } from "@/lib/types";
+
+// Prospecting runs many searches; give it room on platforms that cap duration.
+// Leads are saved as they're found, so a run cut off at the limit keeps its results.
+export const maxDuration = 300;
+
+type Ctx = { params: Promise<{ id: string }> };
+
+const Body = z.object({
+  targetLeads: z.number().int().min(1).max(25).default(10),
+  autoDraft: z.boolean().default(false),
+});
+
+/**
+ * Runs the prospecting agent and streams its progress as server-sent events.
+ * Closing the connection aborts the run so it stops spending API credits.
+ */
+export async function POST(request: Request, { params }: Ctx) {
+  const { id } = await params;
+  const found = await getProduct(id);
+  if (!found) return notFound("Product not found");
+  let product: Product = found;
+  const body = await parseBody(request, Body);
+  if ("response" in body) return body.response;
+  const { targetLeads, autoDraft } = body.data;
+
+  const abort = new AbortController();
+  request.signal.addEventListener("abort", () => abort.abort());
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emit = (event: ProspectEvent) => {
+        if (abort.signal.aborted) return;
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+      try {
+        if (autoDraft && !product.strategy) {
+          emit({ type: "status", message: "Building your go-to-market strategy first…" });
+          product = (await saveStrategy(id, await generateStrategy(product, abort.signal))) ?? product;
+        }
+        await prospect(product, { targetLeads, autoDraft, emit, signal: abort.signal });
+      } catch (err) {
+        if (!abort.signal.aborted) {
+          console.error(err);
+          emit({ type: "error", message: describeClaudeError(err) });
+        }
+      } finally {
+        if (!abort.signal.aborted) controller.close();
+      }
+    },
+    cancel() {
+      abort.abort();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
