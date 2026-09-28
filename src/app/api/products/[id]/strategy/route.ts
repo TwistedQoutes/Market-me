@@ -7,6 +7,7 @@ export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** Generates the go-to-market strategy with Claude and saves it on the product. */
 export async function POST(request: Request, { params }: Ctx) {
   const { id } = await params;
   const product = await getProduct(id);

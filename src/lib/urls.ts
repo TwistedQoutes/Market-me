@@ -8,6 +8,10 @@ const TRACKING_PARAM = /^(utm_\w+|ref|ref_src|ref_url|fbclid|gclid|mc_cid|mc_eid
 // Mirror hosts that serve the same content as the canonical one.
 const HOST_PREFIX = /^(www|old|new|m|mobile|np)\./;
 
+/**
+ * Canonical form of a URL for comparison: drops the scheme, mirror-host
+ * prefixes, trailing slashes, the fragment and tracking params.
+ */
 export function normalizeUrl(raw: string): string {
   let url: URL;
   try {

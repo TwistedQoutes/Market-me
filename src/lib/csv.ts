@@ -17,6 +17,7 @@ const COLUMNS: [header: string, value: (lead: Lead) => string | number][] = [
   ["found_at", (l) => l.createdAt],
 ];
 
+/** Formats one CSV cell: quoted when needed, with formula-like text neutralised. */
 function cell(value: string | number): string {
   let s = String(value);
   // Neutralise spreadsheet formula injection from scraped text.
@@ -24,6 +25,7 @@ function cell(value: string | number): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/** Serialises leads as CSV (CRLF line endings) for import into a CRM or spreadsheet. */
 export function leadsToCsv(leads: Lead[]): string {
   const rows = [COLUMNS.map(([h]) => h), ...leads.map((l) => COLUMNS.map(([, get]) => cell(get(l))))];
   return rows.map((r) => r.join(",")).join("\r\n") + "\r\n";

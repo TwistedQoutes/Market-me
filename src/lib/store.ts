@@ -18,6 +18,7 @@ type DB = {
 
 const EMPTY: DB = { products: [], leads: [], assets: [] };
 
+/** Path of the JSON datastore, honouring MARKETME_DATA_DIR. */
 function dataFile(): string {
   const dir = process.env.MARKETME_DATA_DIR ?? path.join(process.cwd(), ".data");
   return path.join(dir, "db.json");
@@ -27,6 +28,7 @@ let cache: { file: string; db: DB } | null = null;
 // Serialises every read-modify-write so concurrent requests can't clobber each other.
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Returns the in-memory database, reading it from disk on first use. */
 async function load(): Promise<DB> {
   const file = dataFile();
   if (cache?.file === file) return cache.db;
@@ -41,6 +43,7 @@ async function load(): Promise<DB> {
   return db;
 }
 
+/** Writes the database to disk atomically (temp file, then rename). */
 async function persist(db: DB): Promise<void> {
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
@@ -49,12 +52,14 @@ async function persist(db: DB): Promise<void> {
   await rename(tmp, file);
 }
 
+/** Runs a read-only query in the serialised queue. */
 function read<T>(fn: (db: DB) => T): Promise<T> {
   const run = queue.then(async () => fn(await load()));
   queue = run.catch(() => undefined);
   return run;
 }
 
+/** Runs a change in the serialised queue and saves the result to disk. */
 function write<T>(fn: (db: DB) => T): Promise<T> {
   const run = queue.then(async () => {
     const db = await load();
@@ -77,18 +82,22 @@ export function resetStoreCache(): void {
   cache = null;
 }
 
+/** Current time as an ISO 8601 string. */
 const now = () => new Date().toISOString();
 
 // --- Products ---------------------------------------------------------------
 
+/** All products, newest first. */
 export function listProducts(): Promise<Product[]> {
   return read((db) => [...db.products].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
 }
 
+/** One product, or null if it doesn't exist. */
 export function getProduct(id: string): Promise<Product | null> {
   return read((db) => db.products.find((p) => p.id === id) ?? null);
 }
 
+/** Creates a product with no strategy yet. */
 export function createProduct(input: ProductInput): Promise<Product> {
   return write((db) => {
     const product: Product = {
@@ -104,6 +113,7 @@ export function createProduct(input: ProductInput): Promise<Product> {
   });
 }
 
+/** Applies a partial update to a product's brief; null if not found. */
 export function updateProduct(id: string, patch: Partial<ProductInput>): Promise<Product | null> {
   return write((db) => {
     const product = db.products.find((p) => p.id === id);
@@ -113,6 +123,7 @@ export function updateProduct(id: string, patch: Partial<ProductInput>): Promise
   });
 }
 
+/** Stores a generated strategy on a product; null if not found. */
 export function saveStrategy(id: string, strategy: Strategy): Promise<Product | null> {
   return write((db) => {
     const product = db.products.find((p) => p.id === id);
@@ -124,6 +135,7 @@ export function saveStrategy(id: string, strategy: Strategy): Promise<Product | 
   });
 }
 
+/** Deletes a product with its leads and assets; false if not found. */
 export function deleteProduct(id: string): Promise<boolean> {
   return write((db) => {
     const before = db.products.length;
@@ -136,6 +148,7 @@ export function deleteProduct(id: string): Promise<boolean> {
 
 // --- Leads ------------------------------------------------------------------
 
+/** A product's leads, highest intent score first, then newest. */
 export function listLeads(productId: string): Promise<Lead[]> {
   return read((db) =>
     db.leads
@@ -144,6 +157,7 @@ export function listLeads(productId: string): Promise<Lead[]> {
   );
 }
 
+/** One lead of a product, or null. */
 export function getLead(productId: string, leadId: string): Promise<Lead | null> {
   return read((db) => db.leads.find((l) => l.productId === productId && l.id === leadId) ?? null);
 }
@@ -162,6 +176,7 @@ export function addLead(input: NewLead): Promise<{ lead: Lead; duplicate: boolea
   });
 }
 
+/** Updates a lead's status, notes or outreach; null if not found. */
 export function updateLead(
   productId: string,
   leadId: string,
@@ -175,6 +190,7 @@ export function updateLead(
   });
 }
 
+/** Deletes one lead; false if not found. */
 export function deleteLead(productId: string, leadId: string): Promise<boolean> {
   return write((db) => {
     const before = db.leads.length;
@@ -185,12 +201,14 @@ export function deleteLead(productId: string, leadId: string): Promise<boolean> 
 
 // --- Content assets ---------------------------------------------------------
 
+/** A product's content assets, newest first. */
 export function listAssets(productId: string): Promise<ContentAsset[]> {
   return read((db) =>
     db.assets.filter((a) => a.productId === productId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   );
 }
 
+/** Stores newly generated content assets. */
 export function addAssets(assets: Omit<ContentAsset, "id" | "createdAt">[]): Promise<ContentAsset[]> {
   return write((db) => {
     const created = assets.map((a) => ({ ...a, id: randomUUID(), createdAt: now() }));
@@ -199,6 +217,7 @@ export function addAssets(assets: Omit<ContentAsset, "id" | "createdAt">[]): Pro
   });
 }
 
+/** Deletes one content asset; false if not found. */
 export function deleteAsset(productId: string, assetId: string): Promise<boolean> {
   return write((db) => {
     const before = db.assets.length;

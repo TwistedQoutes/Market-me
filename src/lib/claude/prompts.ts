@@ -2,6 +2,7 @@ import type { Lead, Product, Strategy } from "../types";
 
 /** Renders the user's product brief as the context every prompt shares. */
 export function productBrief(product: Product): string {
+  /** One bold-labelled line, or nothing when the value is empty. */
   const field = (label: string, value: string) => (value ? `**${label}:** ${value}\n` : "");
   return [
     `# Product: ${product.name}`,
@@ -16,6 +17,7 @@ export function productBrief(product: Product): string {
   ].join("\n");
 }
 
+/** Condenses the strategy into prompt context; empty when there is no strategy yet. */
 export function strategySummary(strategy: Strategy | null): string {
   if (!strategy) return "";
   return [
@@ -55,6 +57,7 @@ How to work:
 
 Stop when you have saved the target number of leads or have run out of promising queries. Finish with a 2-3 sentence summary of where the buyers are and what they are asking for.`;
 
+/** The prospecting agent's task: brief, strategy, lead target and already-saved URLs to skip. */
 export function prospectPrompt(product: Product, targetLeads: number, knownLeadUrls: string[]): string {
   const today = new Date().toISOString().slice(0, 10);
   return [
@@ -82,6 +85,7 @@ Rules:
 - End with one low-pressure call to action.
 - Match the platform: on Reddit and Hacker News, reply in-thread and follow the community's self-promotion norms (HN is plain and technical); on X, keep it short; on LinkedIn, be professional but human.`;
 
+/** Context for drafting outreach: the brief plus everything known about the lead. */
 export function outreachPrompt(product: Product, lead: Lead): string {
   return [
     productBrief(product),
@@ -108,6 +112,7 @@ Rules:
 - Only make claims supported by the product brief. Never fabricate testimonials, statistics, customer names or awards; where social proof would help, leave a clearly marked placeholder like [customer quote].
 - Keep formatting simple (plain text or light markdown) so it can be pasted anywhere.`;
 
+/** Context for a content pack: brief, strategy, what to write and any extra instructions. */
 export function contentPrompt(product: Product, kindLabel: string, instructions: string): string {
   return [
     productBrief(product),

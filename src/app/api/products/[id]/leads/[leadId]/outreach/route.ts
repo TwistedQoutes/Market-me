@@ -7,6 +7,7 @@ export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ id: string; leadId: string }> };
 
+/** Drafts (or redrafts) outreach for one lead with Claude and saves it on the lead. */
 export async function POST(request: Request, { params }: Ctx) {
   const { id, leadId } = await params;
   const [product, lead] = await Promise.all([getProduct(id), getLead(id, leadId)]);

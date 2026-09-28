@@ -5,6 +5,7 @@ import { Badge, Button, Card, ErrorNote } from "@/components/ui";
 import { api } from "@/lib/api-client";
 import type { Product } from "@/lib/types";
 
+/** Titled card for one part of the strategy. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
@@ -14,11 +15,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Strategy tab: generate the go-to-market plan and display it. */
 export function StrategyPanel({ product, onProduct }: { product: Product; onProduct: (p: Product) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const s = product.strategy;
 
+  /** Generates (or regenerates) the strategy and updates the product. */
   const generate = async () => {
     setBusy(true);
     setError(null);

@@ -36,7 +36,9 @@ export async function POST(request: Request, { params }: Ctx) {
   let closed = false;
 
   const stream = new ReadableStream<Uint8Array>({
+    /** Runs the agent, forwarding each event to the client as it happens. */
     async start(controller) {
+      /** Closes the stream once; safe to call after the client has gone. */
       const close = () => {
         if (closed) return;
         closed = true;
@@ -46,6 +48,7 @@ export async function POST(request: Request, { params }: Ctx) {
           // Already cancelled by the client.
         }
       };
+      /** Sends one event as an SSE `data:` line, unless the stream is closed. */
       const emit = (event: ProspectEvent) => {
         if (closed || abort.signal.aborted) return;
         try {
@@ -69,6 +72,7 @@ export async function POST(request: Request, { params }: Ctx) {
         close();
       }
     },
+    /** Client disconnected: stop emitting and abort the Claude calls. */
     cancel() {
       closed = true;
       abort.abort();

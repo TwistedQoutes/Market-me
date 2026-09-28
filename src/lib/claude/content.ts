@@ -15,6 +15,7 @@ const KIND_GUIDANCE: Record<ContentKind, string> = {
     "Six SEO blog post ideas targeting high-intent searches the personas make. For each: title, target keyword, search intent, and an H2 outline.",
 };
 
+/** Writes a pack of ready-to-publish marketing assets of one kind. */
 export async function generateContent(
   product: Product,
   kind: ContentKind,
