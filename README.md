@@ -95,6 +95,8 @@ npm test
 npm run build
 ```
 
+GitHub Actions (`.github/workflows/ci.yml`) runs the same three steps on every pull request and on pushes to `main`.
+
 ## Roadmap to a multi-tenant SaaS
 
 This version is a single-workspace app you can run for yourself or your team. The code is structured so these next steps don't require rewrites:
