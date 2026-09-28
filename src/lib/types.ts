@@ -1,6 +1,19 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+export const Credentials = z.object({
+  email: z.string().trim().toLowerCase().max(254).pipe(z.email("Enter a valid email address")),
+  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+});
+export type Credentials = z.infer<typeof Credentials>;
+
+/** A signed-in user as the app sees them (never includes the password hash). */
+export type User = { id: string; email: string; createdAt: string };
+
+// ---------------------------------------------------------------------------
 // Product brief: what the user tells us about the thing they want to sell.
 // ---------------------------------------------------------------------------
 
@@ -78,6 +91,8 @@ export type Strategy = z.infer<typeof Strategy>;
 
 export type Product = ProductInput & {
   id: string;
+  /** The user who owns this product; only they can see it and its leads. */
+  ownerId: string;
   createdAt: string;
   updatedAt: string;
   strategy: Strategy | null;

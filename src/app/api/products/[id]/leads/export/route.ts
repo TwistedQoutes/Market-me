@@ -1,5 +1,5 @@
-import { notFound } from "@/lib/http";
-import { getProduct, listLeads } from "@/lib/store";
+import { requireProduct } from "@/lib/http";
+import { listLeads } from "@/lib/store";
 import { leadsToCsv } from "@/lib/csv";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -7,8 +7,9 @@ type Ctx = { params: Promise<{ id: string }> };
 /** CSV export so leads can be imported into any CRM or spreadsheet. */
 export async function GET(_request: Request, { params }: Ctx) {
   const { id } = await params;
-  const product = await getProduct(id);
-  if (!product) return notFound("Product not found");
+  const owned = await requireProduct(id);
+  if ("response" in owned) return owned.response;
+  const { product } = owned;
   const slug = product.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "product";
   return new Response(leadsToCsv(await listLeads(id)), {
     headers: {

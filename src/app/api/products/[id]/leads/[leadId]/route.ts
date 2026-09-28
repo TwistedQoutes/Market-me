@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { notFound, parseBody } from "@/lib/http";
+import { notFound, parseBody, requireProduct } from "@/lib/http";
 import { deleteLead, updateLead } from "@/lib/store";
 import { LEAD_STATUSES } from "@/lib/types";
 
@@ -14,6 +14,8 @@ const Patch = z.object({
 /** Updates a lead's pipeline status and/or notes. */
 export async function PATCH(request: Request, { params }: Ctx) {
   const { id, leadId } = await params;
+  const owned = await requireProduct(id);
+  if ("response" in owned) return owned.response;
   const body = await parseBody(request, Patch);
   if ("response" in body) return body.response;
   const lead = await updateLead(id, leadId, body.data);
@@ -23,5 +25,7 @@ export async function PATCH(request: Request, { params }: Ctx) {
 /** Deletes a lead. */
 export async function DELETE(_request: Request, { params }: Ctx) {
   const { id, leadId } = await params;
+  const owned = await requireProduct(id);
+  if ("response" in owned) return owned.response;
   return (await deleteLead(id, leadId)) ? new NextResponse(null, { status: 204 }) : notFound("Lead not found");
 }

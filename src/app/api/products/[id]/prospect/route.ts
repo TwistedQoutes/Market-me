@@ -2,8 +2,8 @@ import { z } from "zod";
 import { describeClaudeError } from "@/lib/claude/client";
 import { prospect } from "@/lib/claude/prospector";
 import { generateStrategy } from "@/lib/claude/strategy";
-import { notFound, parseBody } from "@/lib/http";
-import { getProduct, saveStrategy } from "@/lib/store";
+import { parseBody, requireProduct } from "@/lib/http";
+import { saveStrategy } from "@/lib/store";
 import type { Product, ProspectEvent } from "@/lib/types";
 
 // Prospecting runs many searches; give it room on platforms that cap duration.
@@ -23,9 +23,10 @@ const Body = z.object({
  */
 export async function POST(request: Request, { params }: Ctx) {
   const { id } = await params;
-  const found = await getProduct(id);
-  if (!found) return notFound("Product not found");
-  let product: Product = found;
+  const owned = await requireProduct(id);
+  if ("response" in owned) return owned.response;
+  const { user } = owned;
+  let product: Product = owned.product;
   const body = await parseBody(request, Body);
   if ("response" in body) return body.response;
   const { targetLeads, autoDraft } = body.data;
@@ -60,7 +61,7 @@ export async function POST(request: Request, { params }: Ctx) {
       try {
         if (autoDraft && !product.strategy) {
           emit({ type: "status", message: "Building your go-to-market strategy first…" });
-          product = (await saveStrategy(id, await generateStrategy(product, abort.signal))) ?? product;
+          product = (await saveStrategy(user.id, id, await generateStrategy(product, abort.signal))) ?? product;
         }
         await prospect(product, { targetLeads, autoDraft, emit, signal: abort.signal });
       } catch (err) {

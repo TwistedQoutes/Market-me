@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { currentUser } from "@/lib/auth/session";
 import { listLeads, listProducts } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +11,42 @@ const STEPS = [
   ["You reach out", "Personalised replies, DMs and a content pack, ready to review and send."],
 ];
 
-/** Home page: onboarding when there are no products, otherwise product cards with lead stats. */
+/** Introduction and "how it works" steps, with a call to action. */
+function Landing({ href, label }: { href: string; label: string }) {
+  return (
+    <div className="mx-auto max-w-3xl py-10 text-center">
+      <h1 className="text-4xl font-semibold tracking-tight">Find the people who want to buy what you&apos;re building.</h1>
+      <p className="mt-4 text-lg text-muted">
+        Market-me is a marketing team built on Claude. It searches the web for people publicly asking for a product
+        like yours, tells you why each one is a fit, and writes the outreach for you.
+      </p>
+      <Link
+        href={href}
+        className="mt-8 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-fg hover:opacity-90"
+      >
+        {label}
+      </Link>
+      <ol className="mt-14 grid gap-4 text-left sm:grid-cols-2">
+        {STEPS.map(([title, body], i) => (
+          <li key={title} className="rounded-xl border border-border bg-surface p-5">
+            <span className="text-sm font-medium text-accent">Step {i + 1}</span>
+            <h2 className="mt-1 font-semibold">{title}</h2>
+            <p className="mt-1 text-sm text-muted">{body}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/**
+ * Home page: the introduction for signed-out visitors, onboarding for users
+ * with no products yet, otherwise their product cards with lead stats.
+ */
 export default async function Dashboard() {
-  const products = await listProducts();
+  const user = await currentUser();
+  if (!user) return <Landing href="/signup" label="Create your free account" />;
+  const products = await listProducts(user.id);
   const stats = await Promise.all(
     products.map(async (p) => {
       const leads = await listLeads(p.id);
@@ -24,32 +58,7 @@ export default async function Dashboard() {
     }),
   );
 
-  if (products.length === 0) {
-    return (
-      <div className="mx-auto max-w-3xl py-10 text-center">
-        <h1 className="text-4xl font-semibold tracking-tight">Find the people who want to buy what you&apos;re building.</h1>
-        <p className="mt-4 text-lg text-muted">
-          Market-me is a marketing team built on Claude. It searches the web for people publicly asking for a product
-          like yours, tells you why each one is a fit, and writes the outreach for you.
-        </p>
-        <Link
-          href="/products/new"
-          className="mt-8 inline-block rounded-lg bg-accent px-5 py-2.5 font-medium text-accent-fg hover:opacity-90"
-        >
-          Add your first product
-        </Link>
-        <ol className="mt-14 grid gap-4 text-left sm:grid-cols-2">
-          {STEPS.map(([title, body], i) => (
-            <li key={title} className="rounded-xl border border-border bg-surface p-5">
-              <span className="text-sm font-medium text-accent">Step {i + 1}</span>
-              <h2 className="mt-1 font-semibold">{title}</h2>
-              <p className="mt-1 text-sm text-muted">{body}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    );
-  }
+  if (products.length === 0) return <Landing href="/products/new" label="Add your first product" />;
 
   return (
     <div className="space-y-6">

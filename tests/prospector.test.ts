@@ -45,7 +45,7 @@ function fakeClient(turns: Turn[]) {
 
 /** Creates a minimal product in the temporary datastore. */
 const newProduct = () =>
-  createProduct({
+  createProduct("owner", {
     name: "X",
     oneLiner: "x",
     description: "x",
@@ -86,7 +86,7 @@ afterEach(async () => {
 
 describe("prospect", () => {
   it("saves verified leads, rejects invented URLs, resumes paused turns and finishes", async () => {
-    const product = await createProduct({
+    const product = await createProduct("owner", {
       name: "Acme Invoices",
       oneLiner: "Invoicing that chases late payments",
       description: "Automatic reminders for freelancers",

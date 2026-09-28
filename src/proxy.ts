@@ -1,37 +1,49 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE } from "./lib/auth/constants";
+
+/** Pages anyone can open without signing in. */
+const PUBLIC_PAGES = new Set(["/", "/login", "/signup"]);
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
- * Optional password gate. When MARKETME_PASSWORD is set, every page and API
- * route requires HTTP Basic auth (user "admin"), which keeps strangers from
- * spending your Claude credits on a deployed instance.
+ * Runs before every request. It does two cheap checks; the real session check
+ * happens in each page and API route against the datastore.
+ *
+ * - Blocks state-changing API calls from other websites (backing up the
+ *   SameSite session cookie).
+ * - Sends visitors without a session cookie to the sign-in page.
  */
 export function proxy(request: NextRequest) {
-  const password = process.env.MARKETME_PASSWORD;
-  if (!password) return NextResponse.next();
+  const { pathname, search } = request.nextUrl;
 
-  const header = request.headers.get("authorization") ?? "";
-  const [scheme, encoded] = header.split(" ");
-  if (scheme === "Basic" && encoded) {
-    let decoded = "";
-    try {
-      decoded = atob(encoded);
-    } catch {
-      // Malformed credentials fall through to the 401 below.
+  if (pathname.startsWith("/api/")) {
+    if (!SAFE_METHODS.has(request.method) && isCrossSite(request)) {
+      return NextResponse.json({ error: "Cross-site request blocked." }, { status: 403 });
     }
-    const supplied = decoded.slice(decoded.indexOf(":") + 1);
-    if (decoded && safeEqual(supplied, password)) return NextResponse.next();
+    return NextResponse.next();
   }
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Market-me", charset="UTF-8"' },
-  });
+
+  if (PUBLIC_PAGES.has(pathname) || request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
+  const login = new URL("/login", request.url);
+  login.searchParams.set("next", pathname + search);
+  return NextResponse.redirect(login);
 }
 
-/** Compares strings in constant time so response timing doesn't leak the password. */
-function safeEqual(a: string, b: string): boolean {
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return diff === 0;
+/**
+ * True when the request's Origin names a different host. Compared by host
+ * rather than full origin so TLS-terminating reverse proxies still work.
+ */
+function isCrossSite(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  let host: string;
+  try {
+    host = new URL(origin).host;
+  } catch {
+    return true;
+  }
+  const expected = [request.headers.get("x-forwarded-host"), request.headers.get("host")];
+  return !expected.includes(host);
 }
 
 export const config = {

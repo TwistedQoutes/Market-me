@@ -1,3 +1,8 @@
+/** Sends the browser to the sign-in page, returning here afterwards. */
+function toSignIn(): void {
+  window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+}
+
 /** Small fetch wrapper for the browser: JSON in, JSON out, readable errors. */
 export async function api<T>(
   path: string,
@@ -11,6 +16,7 @@ export async function api<T>(
     signal: opts.signal,
   });
   if (res.status === 204) return undefined as T;
+  if (res.status === 401 && !path.startsWith("/api/auth/")) toSignIn();
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
   return data as T;
@@ -29,6 +35,7 @@ export async function streamEvents<E>(
     body: JSON.stringify(json),
     signal,
   });
+  if (res.status === 401) toSignIn();
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? `Request failed (${res.status})`);

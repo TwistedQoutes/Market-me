@@ -31,6 +31,8 @@ cp .env.example .env.local   # then set ANTHROPIC_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
+Open the app and create your account. The first account is the owner; see [Accounts](#accounts) for letting other people sign up.
+
 ### Configuration
 
 | Variable | Default | Purpose |
@@ -38,7 +40,21 @@ npm run dev                  # http://localhost:3000
 | `ANTHROPIC_API_KEY` | required | Your Claude API key |
 | `MARKETME_MODEL` | `claude-opus-5` | Model used for every step |
 | `MARKETME_DATA_DIR` | `./.data` | Where the JSON datastore lives |
-| `MARKETME_PASSWORD` | unset | If set, the whole app requires HTTP Basic auth (user `admin`). **Set this before deploying anywhere public.** Otherwise anyone can spend your API credits. |
+| `MARKETME_ALLOWED_EMAILS` | unset | Comma-separated emails that may create an account. `*@company.com` allows a whole domain. |
+| `MARKETME_SIGNUPS` | unset | Set to `open` to let anyone create an account. |
+
+## Accounts
+
+Users sign in with an email and password, and each user sees only their own products, leads and content.
+
+- **Who can sign up:** every account spends your Claude credits, so sign-ups are closed by default after the first (owner) account. Let others in by listing their emails in `MARKETME_ALLOWED_EMAILS`, or set `MARKETME_SIGNUPS=open` to allow anyone.
+- **Passwords** are hashed with scrypt from Node's standard library, using a random salt per password.
+- **Sessions:** the browser holds a random token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` in production) that lasts 30 days. The datastore only keeps a SHA-256 hash of the token, so a leaked data file can't be used to sign in.
+- **Brute-force protection:** sign-in attempts are rate-limited per email and IP, and sign-ups per IP. A failed sign-in takes the same time whether or not the email is registered.
+- **Cross-site protection:** besides the `SameSite` cookie, `src/proxy.ts` rejects state-changing API requests whose `Origin` is another site.
+- **Upgrading from a version without accounts:** the first account created takes ownership of any existing products.
+
+The rate limiter is kept in memory, which suits the single-server JSON setup. If you run several server instances, move it to a shared store such as Redis.
 
 ## Claude integration
 
@@ -69,14 +85,21 @@ src/
     store.ts              JSON-file datastore (swap for Postgres later)
     types.ts              Zod schemas and types shared by client and server
     urls.ts               URL normalisation and retrieved-URL verification
-  proxy.ts                Optional password gate
+    auth/                 Passwords, sessions, sign-up policy, rate limiting
+  proxy.ts                Sign-in redirects and cross-site request blocking
 tests/                    Vitest unit tests (Claude is mocked; no API calls)
 ```
 
 ### API
 
+Every `/api/products` route requires a signed-in session and only reaches the user's own data. Other users' products return 404.
+
 | Method & path | Description |
 |---|---|
+| `POST /api/auth/signup` | Create an account and sign in. Body `{ email, password }` |
+| `POST /api/auth/login` | Sign in. Body `{ email, password }` |
+| `POST /api/auth/logout` | Sign out |
+| `GET /api/auth/me` | The signed-in user, or 401 |
 | `GET/POST /api/products` | List or create products |
 | `GET/PATCH/DELETE /api/products/:id` | Product with its leads and content |
 | `POST /api/products/:id/strategy` | Generate the go-to-market strategy |
@@ -99,9 +122,11 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same three steps on every p
 
 ## Roadmap to a multi-tenant SaaS
 
-This version is a single-workspace app you can run for yourself or your team. The code is structured so these next steps don't require rewrites:
+Accounts are in place: each user has their own products and leads. The code is structured so these next steps don't require rewrites:
 
-- **Accounts and teams:** add auth (e.g. Auth.js or Clerk) and scope `store.ts` queries by workspace.
+- **Teams:** shared workspaces with invites, so several people can work the same products and leads.
+- **Account recovery:** password reset and email verification, which need an email-sending service.
+- **Per-user usage limits:** cap how many prospecting runs each account can start, since they all spend the owner's Claude credits.
 - **Database:** reimplement `store.ts` on Postgres (e.g. Drizzle or Prisma). Everything else goes through that module.
 - **Billing:** add Stripe subscriptions with a monthly prospecting-run allowance per plan.
 - **Always-on prospecting:** a scheduled job that re-runs searches daily and alerts you to new high-intent leads by email or Slack.
