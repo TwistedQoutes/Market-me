@@ -8,8 +8,8 @@ import { createProduct, listLeads, resetStoreCache } from "@/lib/store";
 import type { ProspectEvent } from "@/lib/types";
 
 type Block = Record<string, unknown> & { type: string };
-/** `error` turns throw from finalMessage(); `midStream` ones first emit a stream event, like a response that started. */
-type Turn = { stop_reason: string; content: Block[] } | { error: Error; midStream: boolean };
+/** `error` turns make finalMessage() reject, as the SDK's stream does. */
+type Turn = { stop_reason: string; content: Block[] } | { error: Error };
 
 /** A stand-in for the Anthropic client that replays scripted turns. */
 function fakeClient(turns: Turn[]) {
@@ -22,19 +22,13 @@ function fakeClient(turns: Turn[]) {
           const turn = turns.shift();
           if (!turn) throw new Error("unexpected extra request");
           const listeners: ((block: Block) => void)[] = [];
-          const eventListeners: (() => void)[] = [];
           return {
             on(event: string, fn: (block: Block) => void) {
               if (event === "contentBlock") listeners.push(fn);
-              if (event === "streamEvent") eventListeners.push(fn as () => void);
               return this;
             },
             async finalMessage() {
-              if ("error" in turn) {
-                if (turn.midStream) for (const fn of eventListeners) fn();
-                throw turn.error;
-              }
-              for (const fn of eventListeners) fn();
+              if ("error" in turn) throw turn.error;
               for (const block of turn.content) for (const fn of listeners) fn(block);
               return { ...turn, stop_details: null };
             },
@@ -173,20 +167,28 @@ describe("prospect", () => {
 
   it("re-issues a turn whose tool input was garbled JSON, but not other failures", async () => {
     const product = await newProduct();
-    const garbled = new Anthropic.AnthropicError("Unable to parse tool parameter JSON from model.");
+    // Same message shape as the SDK's BetaMessageStream.
+    const garbled = new Anthropic.AnthropicError(
+      "Unable to parse tool parameter JSON from model. Please retry your request or adjust your prompt.",
+    );
     const { client, requests } = fakeClient([
-      { error: garbled, midStream: true },
+      { error: garbled },
       { stop_reason: "end_turn", content: [{ type: "text", text: "Nothing found." }] },
     ]);
     await prospect(product, { targetLeads: 3, autoDraft: false, emit: () => undefined, client });
     expect(requests).toHaveLength(2);
 
-    // The SDK's stream wraps a missing-credentials error in the same AnthropicError class.
-    const auth = new Anthropic.AnthropicError("Could not resolve authentication method.");
-    const second = fakeClient([{ error: auth, midStream: false }]);
-    await expect(
-      prospect(product, { targetLeads: 3, autoDraft: false, emit: () => undefined, client: second.client }),
-    ).rejects.toBe(auth);
-    expect(second.requests).toHaveLength(1);
+    // The SDK's stream wraps these in the same AnthropicError class; neither may be retried.
+    for (const message of [
+      "Could not resolve authentication method.",
+      "stream ended without producing a Message with role=assistant",
+    ]) {
+      const failure = new Anthropic.AnthropicError(message);
+      const other = fakeClient([{ error: failure }]);
+      await expect(
+        prospect(product, { targetLeads: 3, autoDraft: false, emit: () => undefined, client: other.client }),
+      ).rejects.toBe(failure);
+      expect(other.requests).toHaveLength(1);
+    }
   });
 });

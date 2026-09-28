@@ -148,10 +148,6 @@ export async function prospect(product: Product, opts: ProspectOptions): Promise
       { signal },
     );
 
-    let responseStarted = false;
-    stream.on("streamEvent", () => {
-      responseStarted = true;
-    });
     stream.on("contentBlock", (block) => {
       if (block.type !== "server_tool_use") return;
       const input = (block.input ?? {}) as { query?: unknown; url?: unknown };
@@ -169,13 +165,8 @@ export async function prospect(product: Product, opts: ProspectOptions): Promise
       jsonRetries = 0;
     } catch (err) {
       // With eager input streaming, a tool input that isn't valid JSON rejects
-      // the stream mid-response with a plain AnthropicError. Re-issue that turn
-      // a couple of times. The stream wraps every other failure in the same
-      // class, so only retry once the response had started: failures before
-      // that (missing credentials, network) and API errors are rethrown.
-      const garbledToolInput =
-        responseStarted && err instanceof Anthropic.AnthropicError && !(err instanceof Anthropic.APIError);
-      if (!garbledToolInput || signal?.aborted || jsonRetries++ >= 2) throw err;
+      // the stream. Re-issue that turn a couple of times; rethrow anything else.
+      if (!isGarbledToolInput(err) || signal?.aborted || jsonRetries++ >= 2) throw err;
       emit({ type: "status", message: "Retrying a garbled tool call…" });
       continue;
     }
@@ -212,6 +203,21 @@ export async function prospect(product: Product, opts: ProspectOptions): Promise
   if (opts.autoDraft) await autoDraft(product, recorder.saved, emit, signal);
 
   emit({ type: "done", leadsFound: recorder.saved.length, searches, summary });
+}
+
+/**
+ * The SDK has no dedicated class for a tool input it couldn't parse, and its
+ * message stream wraps every other failure (missing credentials, a stream that
+ * ended early) in the same AnthropicError, so recognise it by its message.
+ * Anything else, including API errors, is not retried: a retry could re-run
+ * paid web searches.
+ */
+function isGarbledToolInput(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.AnthropicError &&
+    !(err instanceof Anthropic.APIError) &&
+    err.message.startsWith("Unable to parse tool parameter JSON")
+  );
 }
 
 /** Drafts outreach for the strongest new leads, a few at a time. */
