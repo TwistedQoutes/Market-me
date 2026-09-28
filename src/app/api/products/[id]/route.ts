@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { notFound, parseBody } from "@/lib/http";
 import { deleteProduct, getProduct, listAssets, listLeads, updateProduct } from "@/lib/store";
-import { ProductInput } from "@/lib/types";
+import { ProductPatch } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,7 +15,7 @@ export async function GET(_request: Request, { params }: Ctx) {
 
 export async function PATCH(request: Request, { params }: Ctx) {
   const { id } = await params;
-  const body = await parseBody(request, ProductInput.partial());
+  const body = await parseBody(request, ProductPatch);
   if ("response" in body) return body.response;
   const product = await updateProduct(id, body.data);
   return product ? NextResponse.json({ product }) : notFound("Product not found");

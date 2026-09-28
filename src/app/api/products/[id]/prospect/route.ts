@@ -33,12 +33,26 @@ export async function POST(request: Request, { params }: Ctx) {
   const abort = new AbortController();
   request.signal.addEventListener("abort", () => abort.abort());
   const encoder = new TextEncoder();
+  let closed = false;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        try {
+          controller.close();
+        } catch {
+          // Already cancelled by the client.
+        }
+      };
       const emit = (event: ProspectEvent) => {
-        if (abort.signal.aborted) return;
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        if (closed || abort.signal.aborted) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        } catch {
+          closed = true; // The client went away mid-run.
+        }
       };
       try {
         if (autoDraft && !product.strategy) {
@@ -52,10 +66,11 @@ export async function POST(request: Request, { params }: Ctx) {
           emit({ type: "error", message: describeClaudeError(err) });
         }
       } finally {
-        if (!abort.signal.aborted) controller.close();
+        close();
       }
     },
     cancel() {
+      closed = true;
       abort.abort();
     },
   });

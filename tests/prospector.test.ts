@@ -8,7 +8,8 @@ import { createProduct, listLeads, resetStoreCache } from "@/lib/store";
 import type { ProspectEvent } from "@/lib/types";
 
 type Block = Record<string, unknown> & { type: string };
-type Turn = { stop_reason: string; content: Block[] } | { error: Error };
+/** `error` turns throw from finalMessage(); `midStream` ones first emit a stream event, like a response that started. */
+type Turn = { stop_reason: string; content: Block[] } | { error: Error; midStream: boolean };
 
 /** A stand-in for the Anthropic client that replays scripted turns. */
 function fakeClient(turns: Turn[]) {
@@ -21,13 +22,19 @@ function fakeClient(turns: Turn[]) {
           const turn = turns.shift();
           if (!turn) throw new Error("unexpected extra request");
           const listeners: ((block: Block) => void)[] = [];
+          const eventListeners: (() => void)[] = [];
           return {
             on(event: string, fn: (block: Block) => void) {
               if (event === "contentBlock") listeners.push(fn);
+              if (event === "streamEvent") eventListeners.push(fn as () => void);
               return this;
             },
             async finalMessage() {
-              if ("error" in turn) throw turn.error;
+              if ("error" in turn) {
+                if (turn.midStream) for (const fn of eventListeners) fn();
+                throw turn.error;
+              }
+              for (const fn of eventListeners) fn();
               for (const block of turn.content) for (const fn of listeners) fn(block);
               return { ...turn, stop_details: null };
             },
@@ -168,14 +175,15 @@ describe("prospect", () => {
     const product = await newProduct();
     const garbled = new Anthropic.AnthropicError("Unable to parse tool parameter JSON from model.");
     const { client, requests } = fakeClient([
-      { error: garbled },
+      { error: garbled, midStream: true },
       { stop_reason: "end_turn", content: [{ type: "text", text: "Nothing found." }] },
     ]);
     await prospect(product, { targetLeads: 3, autoDraft: false, emit: () => undefined, client });
     expect(requests).toHaveLength(2);
 
-    const auth = new Error("Could not resolve authentication method.");
-    const second = fakeClient([{ error: auth }]);
+    // The SDK's stream wraps a missing-credentials error in the same AnthropicError class.
+    const auth = new Anthropic.AnthropicError("Could not resolve authentication method.");
+    const second = fakeClient([{ error: auth, midStream: false }]);
     await expect(
       prospect(product, { targetLeads: 3, autoDraft: false, emit: () => undefined, client: second.client }),
     ).rejects.toBe(auth);

@@ -148,6 +148,10 @@ export async function prospect(product: Product, opts: ProspectOptions): Promise
       { signal },
     );
 
+    let responseStarted = false;
+    stream.on("streamEvent", () => {
+      responseStarted = true;
+    });
     stream.on("contentBlock", (block) => {
       if (block.type !== "server_tool_use") return;
       const input = (block.input ?? {}) as { query?: unknown; url?: unknown };
@@ -165,9 +169,12 @@ export async function prospect(product: Product, opts: ProspectOptions): Promise
       jsonRetries = 0;
     } catch (err) {
       // With eager input streaming, a tool input that isn't valid JSON rejects
-      // the stream with a plain AnthropicError. Re-issue that turn a couple of
-      // times; rethrow API errors (a subclass) and anything else.
-      const garbledToolInput = err instanceof Anthropic.AnthropicError && !(err instanceof Anthropic.APIError);
+      // the stream mid-response with a plain AnthropicError. Re-issue that turn
+      // a couple of times. The stream wraps every other failure in the same
+      // class, so only retry once the response had started: failures before
+      // that (missing credentials, network) and API errors are rethrown.
+      const garbledToolInput =
+        responseStarted && err instanceof Anthropic.AnthropicError && !(err instanceof Anthropic.APIError);
       if (!garbledToolInput || signal?.aborted || jsonRetries++ >= 2) throw err;
       emit({ type: "status", message: "Retrying a garbled tool call…" });
       continue;

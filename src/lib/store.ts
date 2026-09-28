@@ -59,7 +59,13 @@ function write<T>(fn: (db: DB) => T): Promise<T> {
   const run = queue.then(async () => {
     const db = await load();
     const result = fn(db);
-    await persist(db);
+    try {
+      await persist(db);
+    } catch (err) {
+      // fn mutated the cached copy in place; drop it so reads don't see unsaved changes.
+      cache = null;
+      throw err;
+    }
     return result;
   });
   queue = run.catch(() => undefined);

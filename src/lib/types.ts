@@ -4,16 +4,27 @@ import { z } from "zod";
 // Product brief: what the user tells us about the thing they want to sell.
 // ---------------------------------------------------------------------------
 
-export const ProductInput = z.object({
+const productFields = {
   name: z.string().trim().min(1, "Name is required").max(120),
   oneLiner: z.string().trim().min(1, "One-liner is required").max(280),
   description: z.string().trim().min(1, "Description is required").max(6000),
-  website: z.string().trim().max(500).default(""),
-  pricing: z.string().trim().max(500).default(""),
-  targetCustomers: z.string().trim().max(2000).default(""),
-  differentiators: z.string().trim().max(2000).default(""),
+  website: z.string().trim().max(500),
+  pricing: z.string().trim().max(500),
+  targetCustomers: z.string().trim().max(2000),
+  differentiators: z.string().trim().max(2000),
+};
+
+export const ProductInput = z.object({
+  ...productFields,
+  website: productFields.website.default(""),
+  pricing: productFields.pricing.default(""),
+  targetCustomers: productFields.targetCustomers.default(""),
+  differentiators: productFields.differentiators.default(""),
 });
 export type ProductInput = z.infer<typeof ProductInput>;
+
+/** Partial update: fields the client omits stay absent (no defaults), so they aren't overwritten. */
+export const ProductPatch = z.object(productFields).partial();
 
 // ---------------------------------------------------------------------------
 // Go-to-market strategy Claude generates from the brief.
