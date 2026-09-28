@@ -4,6 +4,7 @@ import { Workspace } from "./Workspace";
 
 export const dynamic = "force-dynamic";
 
+/** Loads a product with its leads and assets on the server, then renders the client workspace. */
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);

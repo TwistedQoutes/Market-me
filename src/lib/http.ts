@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import type { z } from "zod";
 import { describeClaudeError } from "./claude/client";
 
+/** JSON error response shaped `{ error: message }` with the given status. */
 export function jsonError(message: string, status: number): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }
 
+/** 404 JSON error response. */
 export const notFound = (what = "Not found") => jsonError(what, 404);
 
 /** Parses a JSON request body against a schema, returning a 400 response on failure. */

@@ -59,11 +59,14 @@ export class LeadRecorder {
     private readonly emit: (event: ProspectEvent) => void,
   ) {}
 
+  /** Whether this run has saved as many leads as were asked for. */
   get targetReached(): boolean {
     return this.saved.length >= this.target;
   }
 
+  /** Validates, verifies and stores one save_lead call, returning the tool result for Claude. */
   async handle(toolUse: BetaToolUseBlock): Promise<BetaToolResultBlockParam> {
+    /** Builds the tool_result block sent back to Claude. */
     const result = (content: string, isError = false): BetaToolResultBlockParam => ({
       type: "tool_result",
       tool_use_id: toolUse.id,
@@ -231,6 +234,7 @@ async function autoDraft(
   if (queue.length === 0) return;
   emit({ type: "status", message: `Drafting outreach for ${queue.length} high-intent lead(s)…` });
 
+  /** Drafts outreach for queued leads one at a time until the queue is empty. */
   const worker = async () => {
     for (let lead = queue.shift(); lead; lead = queue.shift()) {
       if (signal?.aborted) return;

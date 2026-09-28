@@ -5,6 +5,7 @@ import { Badge, Button, Card, CopyButton, ErrorNote, Field, inputClass } from "@
 import { api } from "@/lib/api-client";
 import { CONTENT_KINDS, type ContentAsset, type ContentKind, type Product } from "@/lib/types";
 
+/** Content tab: generate, copy and delete marketing assets. */
 export function ContentPanel({
   product,
   assets,
@@ -19,6 +20,7 @@ export function ContentPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Asks Claude for a content pack and adds the new assets to the top of the list. */
   const generate = async () => {
     setBusy(true);
     setError(null);
@@ -34,6 +36,7 @@ export function ContentPanel({
     }
   };
 
+  /** Removes an asset right away, restoring it if the delete fails. */
   const remove = async (asset: ContentAsset) => {
     setAssets((prev) => prev.filter((a) => a.id !== asset.id));
     try {

@@ -17,6 +17,7 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   dismissed: "Dismissed",
 };
 
+/** Sort comparator: highest intent score first. */
 const byScore = (a: Lead, b: Lead) => b.intentScore - a.intentScore;
 
 /** Only link to http(s) URLs; lead URLs originate from the open web. */
@@ -24,6 +25,7 @@ function safeHref(url: string): string | undefined {
   return /^https?:\/\//i.test(url) ? url : undefined;
 }
 
+/** Buyers tab: run the prospecting agent, watch its activity, and work through the leads. */
 export function LeadsPanel({
   product,
   leads,
@@ -45,9 +47,11 @@ export function LeadsPanel({
   const abortRef = useRef<AbortController | null>(null);
   const logId = useRef(0);
 
+  /** Appends an activity-log line, keeping the most recent 200. */
   const addLog = (kind: string, text: string, href?: string) =>
     setLog((prev) => [...prev, { id: logId.current++, kind, text, href }].slice(-200));
 
+  /** Applies one streamed prospecting event to the lead list and activity log. */
   const onEvent = (event: ProspectEvent) => {
     switch (event.type) {
       case "status":
@@ -75,6 +79,7 @@ export function LeadsPanel({
     }
   };
 
+  /** Starts a prospecting run and streams its events until it finishes, is stopped or fails. */
   const run = async () => {
     const controller = new AbortController();
     abortRef.current = controller;
@@ -94,6 +99,7 @@ export function LeadsPanel({
   };
 
   const visible = leads.filter((l) => (filter === "active" ? l.status !== "dismissed" : l.status === filter));
+  /** Swaps an updated lead into the list in place. */
   const replace = (lead: Lead) => setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
 
   return (
@@ -205,12 +211,14 @@ export function LeadsPanel({
   );
 }
 
+/** One lead: who they are, what they said, and the outreach drafted for them. */
 function LeadCard({ productId, lead, onChange }: { productId: string; lead: Lead; onChange: (lead: Lead) => void }) {
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const base = `/api/products/${productId}/leads/${lead.id}`;
   const href = safeHref(lead.sourceUrl);
 
+  /** Changes the lead's status right away, reverting it if the save fails. */
   const setStatus = async (status: LeadStatus) => {
     onChange({ ...lead, status });
     try {
@@ -222,6 +230,7 @@ function LeadCard({ productId, lead, onChange }: { productId: string; lead: Lead
     }
   };
 
+  /** Asks Claude to draft (or rewrite) outreach for this lead. */
   const draft = async () => {
     setDrafting(true);
     setError(null);

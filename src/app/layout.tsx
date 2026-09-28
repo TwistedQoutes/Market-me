@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description: "Claude finds the people who want to buy your product, then does the marketing for you.",
 };
 
+/** App shell: the header and navigation around every page. */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">

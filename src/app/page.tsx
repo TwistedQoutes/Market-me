@@ -10,6 +10,7 @@ const STEPS = [
   ["You reach out", "Personalised replies, DMs and a content pack, ready to review and send."],
 ];
 
+/** Home page: onboarding when there are no products, otherwise product cards with lead stats. */
 export default async function Dashboard() {
   const products = await listProducts();
   const stats = await Promise.all(

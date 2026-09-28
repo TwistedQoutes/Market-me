@@ -20,6 +20,7 @@ type Tab = (typeof TABS)[number][0];
 
 export type ProductData = { product: Product; leads: Lead[]; assets: ContentAsset[] };
 
+/** Product page shell: header, tabs, and the state the tabs share. */
 export function Workspace({
   initialProduct,
   initialLeads,
@@ -35,6 +36,7 @@ export function Workspace({
   const [assets, setAssets] = useState(initialAssets);
   const [tab, setTab] = useState<Tab>("leads");
 
+  /** Reloads the product, leads and assets from the server. */
   const refresh = async () => {
     const data = await api<ProductData>(`/api/products/${product.id}`);
     setProduct(data.product);

@@ -17,16 +17,19 @@ function fakeClient(turns: Turn[]) {
   const client = {
     beta: {
       messages: {
+        /** Records the request and returns a stream that replays the next scripted turn. */
         stream(params: { messages: { role: string; content: unknown }[] }) {
           requests.push(structuredClone(params));
           const turn = turns.shift();
           if (!turn) throw new Error("unexpected extra request");
           const listeners: ((block: Block) => void)[] = [];
           return {
+            /** Registers contentBlock listeners, as the SDK stream does. */
             on(event: string, fn: (block: Block) => void) {
               if (event === "contentBlock") listeners.push(fn);
               return this;
             },
+            /** Emits the turn's blocks to listeners, then resolves or rejects like the SDK stream. */
             async finalMessage() {
               if ("error" in turn) throw turn.error;
               for (const block of turn.content) for (const fn of listeners) fn(block);
@@ -40,6 +43,7 @@ function fakeClient(turns: Turn[]) {
   return { client: client as unknown as Anthropic, requests };
 }
 
+/** Creates a minimal product in the temporary datastore. */
 const newProduct = () =>
   createProduct({
     name: "X",
@@ -51,6 +55,7 @@ const newProduct = () =>
     differentiators: "",
   });
 
+/** A save_lead tool call for the given URL. */
 const lead = (id: string, url: string, score = 85) => ({
   type: "tool_use",
   id,

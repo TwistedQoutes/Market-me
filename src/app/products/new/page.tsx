@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { api } from "@/lib/api-client";
 import type { Product } from "@/lib/types";
 
+/** New-product form; creates the product and opens its workspace. */
 export default function NewProductPage() {
   const router = useRouter();
   return (

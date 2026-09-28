@@ -11,6 +11,7 @@ const Patch = z.object({
   notes: z.string().max(5000).optional(),
 });
 
+/** Updates a lead's pipeline status and/or notes. */
 export async function PATCH(request: Request, { params }: Ctx) {
   const { id, leadId } = await params;
   const body = await parseBody(request, Patch);
@@ -19,6 +20,7 @@ export async function PATCH(request: Request, { params }: Ctx) {
   return lead ? NextResponse.json({ lead }) : notFound("Lead not found");
 }
 
+/** Deletes a lead. */
 export async function DELETE(_request: Request, { params }: Ctx) {
   const { id, leadId } = await params;
   return (await deleteLead(id, leadId)) ? new NextResponse(null, { status: 204 }) : notFound("Lead not found");

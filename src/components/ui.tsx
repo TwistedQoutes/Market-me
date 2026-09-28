@@ -11,6 +11,7 @@ const VARIANTS: Record<Variant, string> = {
   danger: "text-red-600 dark:text-red-400 hover:bg-red-500/10",
 };
 
+/** Button with visual variants and a built-in busy spinner. */
 export function Button({
   variant = "secondary",
   busy = false,
@@ -31,6 +32,7 @@ export function Button({
   );
 }
 
+/** Small inline loading spinner. */
 export function Spinner() {
   return (
     <span
@@ -40,6 +42,7 @@ export function Spinner() {
   );
 }
 
+/** Bordered surface used for panels and list items. */
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-xl border border-border bg-surface p-5 ${className}`}>{children}</div>;
 }
@@ -52,6 +55,7 @@ const TONES = {
   red: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 
+/** Small pill label in one of a few color tones. */
 export function Badge({ tone = "gray", children }: { tone?: keyof typeof TONES; children: ReactNode }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>
@@ -60,6 +64,7 @@ export function Badge({ tone = "gray", children }: { tone?: keyof typeof TONES; 
   );
 }
 
+/** Copies text to the clipboard and briefly shows "Copied". */
 export function CopyButton({ text, label = "Copy", onCopied }: { text: string; label?: string; onCopied?: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -79,6 +84,7 @@ export function CopyButton({ text, label = "Copy", onCopied }: { text: string; l
   );
 }
 
+/** Inline error message; renders nothing when there is no error. */
 export function ErrorNote({ message }: { message: string | null }) {
   if (!message) return null;
   return (
@@ -88,6 +94,7 @@ export function ErrorNote({ message }: { message: string | null }) {
   );
 }
 
+/** Form field with a label and an optional hint. */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="block space-y-1.5">

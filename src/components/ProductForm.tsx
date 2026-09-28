@@ -14,6 +14,7 @@ const EMPTY: ProductInput = {
   differentiators: "",
 };
 
+/** Product brief form, used both to create a product and to edit its brief. */
 export function ProductForm({
   initial,
   submitLabel,
@@ -27,6 +28,7 @@ export function ProductForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Wires an input's value and onChange to one field of the form state. */
   const bind = (key: keyof ProductInput) => ({
     value: values[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>

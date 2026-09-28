@@ -14,6 +14,7 @@ const Body = z.object({
   instructions: z.string().max(2000).default(""),
 });
 
+/** Generates a content pack of the requested kind with Claude and stores its assets. */
 export async function POST(request: Request, { params }: Ctx) {
   const { id } = await params;
   const product = await getProduct(id);

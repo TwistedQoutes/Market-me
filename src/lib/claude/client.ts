@@ -11,6 +11,7 @@ export const MODEL = process.env.MARKETME_MODEL || "claude-opus-5";
 
 let client: Anthropic | null = null;
 
+/** The shared Anthropic client, created on first use. */
 export function claude(): Anthropic {
   // Lazily constructed so a missing key surfaces as a request error, not a build failure.
   client ??= new Anthropic();
@@ -42,6 +43,7 @@ export function describeClaudeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Thrown when Claude (and its fallback model) declines a request. */
 export class RefusalError extends Error {
   constructor(category: string | null | undefined) {
     super(
